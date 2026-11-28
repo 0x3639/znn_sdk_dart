@@ -18,7 +18,8 @@ class Zenon {
   WalletDefinition? defaultKeyStorePath;
 
   late WsClient wsClient;
-  late WalletManager keyStoreManager;
+  WalletManager? _customKeyStoreManager;
+  KeyStoreManager? _defaultKeyStoreManager;
 
   late api.LedgerApi ledger;
   late api.StatsApi stats;
@@ -30,8 +31,6 @@ class Zenon {
   }
 
   Zenon._internal() {
-    keyStoreManager = KeyStoreManager(walletPath: znnDefaultWalletDirectory);
-
     wsClient = WsClient();
     ledger = api.LedgerApi();
     stats = api.StatsApi();
@@ -42,6 +41,34 @@ class Zenon {
     stats.setClient(wsClient);
     embedded.setClient(wsClient);
     subscribe.setClient(wsClient);
+  }
+
+  WalletManager get keyStoreManager {
+    final custom = _customKeyStoreManager;
+    if (custom != null) {
+      return custom;
+    }
+    final walletDir = znnDefaultWalletDirectory;
+    final current = _defaultKeyStoreManager;
+    if (current == null ||
+        !identical(current.walletPath, walletDir) ||
+        current.walletPath.path != walletDir.path) {
+      _defaultKeyStoreManager = KeyStoreManager(walletPath: walletDir);
+    }
+    return _defaultKeyStoreManager!;
+  }
+
+  set keyStoreManager(WalletManager manager) {
+    _customKeyStoreManager = manager;
+    _defaultKeyStoreManager = null;
+  }
+
+  /// Clears any custom [keyStoreManager] override and cached default manager so
+  /// the next read of [keyStoreManager] resolves lazily from
+  /// [znnDefaultWalletDirectory].
+  void resetKeyStoreManager() {
+    _customKeyStoreManager = null;
+    _defaultKeyStoreManager = null;
   }
 
   Future<AccountBlockTemplate> send(AccountBlockTemplate transaction,
